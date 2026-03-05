@@ -1,22 +1,26 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import sequelize from './config/database'; // Conexão com o banco
-import './models/ProductModel'; // Importa o Model para o Sequelize criar a tabela
-import productRoutes from './routes/ProductRoutes'; // ACRESCENTADO: Importa suas novas rotas
+import sequelize from './config/database';
+import './models/ProductModel';
+import './models/UserModel'; // Importante para criar a tabela de usuários
+import productRoutes from './routes/ProductRoutes';
 
 dotenv.config();
 const app = express();
 
 // Middlewares
+// Permite que o Express entenda JSON enviado pelo Insomnia ou pelo React
 app.use(express.json());
 
 // Rotas
-app.use(productRoutes); // ACRESCENTADO: Ativa as rotas de produto
+// Ativa as rotas de produtos e de usuários que configuramos
+app.use(productRoutes);
 
 const PORT = process.env.PORT || 3000;
 
-// O sync() verifica seus Models e cria as tabelas no MySQL automaticamente
-sequelize.sync({ force: false })
+// O sync({ alter: true }) atualiza as tabelas existentes com novas colunas (como o 'role')
+// sem apagar os dados atuais.
+sequelize.sync({ alter: true })
     .then(() => {
         console.log('Banco CodeWear conectado e tabelas sincronizadas!');
         app.listen(PORT, () => {
