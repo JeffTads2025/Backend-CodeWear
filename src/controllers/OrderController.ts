@@ -7,7 +7,7 @@ import User from '../models/UserModel';
 import sequelize from '../config/database';
 import { AuthRequest } from '../types';
 
-// Funções auxiliares para reduzir complexidade
+// Funções auxiliares para manter a responsabilidade única
 const validateCart = async (userId: number) => {
   const cartItems = await Cart.findAll({ where: { userId }, include: [{ model: Product }] });
   if (cartItems.length === 0) throw new Error("Carrinho vazio");
@@ -40,10 +40,12 @@ export const checkout = async (req: AuthRequest, res: Response) => {
     const cartItems = await validateCart(userId);
     const user = await User.findByPk(userId);
     const finalAddress = address || user?.address;
+    
     if (!finalAddress) return res.status(400).json({ message: "Endereço necessário" });
 
     const totalValue = calculateTotal(cartItems);
     const order = await createOrder(userId, totalValue, paymentMethod, finalAddress, t);
+    
     await createOrderItemsAndUpdateStock(order.id, cartItems, t);
     await Cart.destroy({ where: { userId }, transaction: t });
 
