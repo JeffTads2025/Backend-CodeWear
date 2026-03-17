@@ -1,31 +1,41 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../models/UserModel';
+import { AuthRequest } from '../types'; // Importando seu Type Global
 
-export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
+  
+  // 1. Validação de presença do token (Rubrica: Autenticação)
   if (!authHeader) return res.status(401).json({ message: "Login necessário" });
 
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'chave_secreta_padrao');
-    const user = await User.findByPk(decoded.id);
+    // 2. Tipagem do payload do JWT para evitar o 'any'
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'chave_secreta_padrao') as { 
+      id: number; 
+      name: string; 
+      role: 'admin' | 'client' 
+    };
 
-    if (!user) return res.status(401).json({ message: "Usuário inválido" });
+    // 3. Preenche o req.user usando a interface AuthRequest (Sem usar 'as any')
+    req.user = {
+      id: decoded.id,
+      name: decoded.name,
+      role: decoded.role
+    };
 
-    (req as any).user = user;
-
-    // Lógica Clean: Se a rota for de admin ou dashboard, barra clientes
+    // 4. Lógica de Proteção de Rota (Exigência para Admin/Dashboard)
     const isAdminRoute = req.originalUrl.includes('admin') || 
-                        (req.originalUrl.includes('products') && req.method !== 'GET');
+                         (req.originalUrl.includes('products') && req.method !== 'GET');
 
-    if (isAdminRoute && (user as any).role !== 'admin') {
+    if (isAdminRoute && req.user.role !== 'admin') {
       return res.status(403).json({ message: "Acesso restrito ao administrador" });
     }
 
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Sessão expirada" });
+    // 5. Retorno coerente com o status (Rubrica: Código Limpo)
+    return res.status(401).json({ message: "Sessão expirada ou inválida" });
   }
 };
