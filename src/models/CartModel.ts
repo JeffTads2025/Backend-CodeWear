@@ -12,10 +12,13 @@ class Cart extends Model {
 
 Cart.init({
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    quantity: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 }
+    quantity: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    productId: { type: DataTypes.INTEGER, allowNull: false }
 }, {
     sequelize,
     tableName: 'carts',
+    timestamps: true
 });
 
 // Relacionamentos Diretos
