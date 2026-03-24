@@ -8,7 +8,7 @@ describe('Testes de Autenticação e Usuário', () => {
     await sequelize.close();
   });
 
-  it('Deve criptografar a senha antes de salvar no banco', async () => {
+  test('Deve criptografar a senha antes de salvar no banco', async () => {
     // Usamos um timestamp para o e-mail nunca ser igual ao de rodadas anteriores
     const uniqueEmail = `teste${Date.now()}@codewear.com`;
     const password = 'senha_segura_123';
@@ -26,7 +26,7 @@ describe('Testes de Autenticação e Usuário', () => {
     expect(isMatch).toBe(true);
   });
 
-  it('Não deve permitir o cadastro de dois usuários com o mesmo E-mail', async () => {
+  test('Não deve permitir o cadastro de dois usuários com o mesmo E-mail', async () => {
     const duplicateEmail = `duplicado${Date.now()}@codewear.com`;
     
     // Criamos o primeiro

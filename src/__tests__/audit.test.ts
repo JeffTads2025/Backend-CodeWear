@@ -8,7 +8,7 @@ describe('Testes de Auditoria (Logs)', () => {
     await sequelize.close();
   });
 
-  it('Deve ser capaz de registrar uma ação de administrador no log', async () => {
+  test('Deve ser capaz de registrar uma ação de administrador no log', async () => {
     const logData = {
       adminId: 1,
       adminName: 'Admin Jeff',
@@ -23,7 +23,7 @@ describe('Testes de Auditoria (Logs)', () => {
     expect(log.adminName).toBe('Admin Jeff');
   });
 
-  it('Deve exigir que os campos obrigatórios sejam informados', async () => {
+  test('Deve exigir que os campos obrigatórios sejam informados', async () => {
     try {
       // Tentando criar sem os campos obrigatórios (forçando o erro de validação)
       // Usamos o type casting apenas para simular o erro, sem usar 'any'

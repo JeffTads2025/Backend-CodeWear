@@ -7,7 +7,7 @@ describe('Testes de Pedidos (Checkout)', () => {
     await sequelize.close();
   });
 
-  it('Deve criar um pedido com status inicial "pendente"', async () => {
+  test('Deve criar um pedido com status inicial "pendente"', async () => {
     const order = await Order.create({
       totalValue: 150.00,
       paymentMethod: 'Cartão de Crédito',
@@ -18,7 +18,7 @@ describe('Testes de Pedidos (Checkout)', () => {
     expect(order.status).toBe('pendente');
   });
 
-  it('Deve validar se o valor total do pedido é positivo', () => {
+  test('Deve validar se o valor total do pedido é positivo', () => {
     // Mudamos para 10.00 para o teste passar no critério >= 0
     const order = Order.build({ totalValue: 10.00 });
     expect(order.totalValue).toBeGreaterThanOrEqual(0);
