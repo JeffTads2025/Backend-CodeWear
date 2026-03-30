@@ -1,43 +1,47 @@
-import { Router } from 'express';
-import { listProducts, createProduct, updateProduct, deleteProduct } from '../controllers/ProductController';
-import { createUser, loginUser } from '../controllers/UserController';
-import { addToCart, listCart, removeItem, clearCart } from '../controllers/CartController';
-import { checkout, listMyOrders, getAdminDashboard } from '../controllers/OrderController';
-import { authMiddleware } from '../middlewares/authMiddleware';
-import AuditLog from '../models/AuditLogModel'; // Importado para a rota de logs
+// import { Router } from 'express';
+// // Importação dos Controllers
+// import { listProducts, createProduct, updateProduct, deleteProduct } from '../controllers/ProductController';
+// import { createUser, loginUser, getMe, updateUser, listUsersAdmin } from '../controllers/UserController';
+// import { addToCart, listCart, removeItem } from '../controllers/CartController';
+// import { checkout, listMyOrders, getAdminDashboard, listAllOrdersAdmin } from '../controllers/OrderController';
+// import { listLogs } from '../controllers/AuditController'; // <-- Importante: Controller de Auditoria
+// import { authMiddleware } from '../middlewares/authMiddleware';
 
-const router = Router();
+// const router = Router();
 
-// --- Rotas Públicas ---
-// Qualquer um pode ver produtos, criar conta ou logar
-router.get('/products', listProducts);
-router.post('/users', createUser);
-router.post('/login', loginUser);
+// // --- ROTAS PÚBLICAS ---
+// router.get('/products', listProducts); // Já suporta ?page= e ?limit=
+// router.post('/users', createUser);
+// router.post('/login', loginUser);
 
-// --- Rotas Cliente (Privadas) ---
-// Precisa estar logado (authMiddleware)
-router.post('/cart', authMiddleware, addToCart);
-router.get('/cart', authMiddleware, listCart);
-router.delete('/cart/:id', authMiddleware, removeItem);
-router.post('/checkout', authMiddleware, checkout);
-router.get('/orders', authMiddleware, listMyOrders);
+// // --- ROTAS DO CLIENTE ---
+// router.get('/me', authMiddleware, getMe);
+// router.put('/users/profile', authMiddleware, updateUser);
+// router.post('/cart', authMiddleware, addToCart);
+// router.get('/cart', authMiddleware, listCart);
+// router.delete('/cart/:id', authMiddleware, removeItem);
+// router.post('/checkout', authMiddleware, checkout);
+// router.get('/orders', authMiddleware, listMyOrders);
 
-// --- Rotas Admin (Restritas) ---
-// O authMiddleware aqui também valida se o 'role' é 'admin'
-router.post('/products', authMiddleware, createProduct);
-router.put('/products/:id', authMiddleware, updateProduct);
-router.delete('/products/:id', authMiddleware, deleteProduct);
-router.get('/admin/dashboard', authMiddleware, getAdminDashboard);
+// // --- ROTAS DO ADMIN ---
 
-// --- NOVA ROTA DE AUDITORIA ---
-// Esta rota permite que o Admin veja quem alterou preços ou deletou itens
-router.get('/admin/logs', authMiddleware, async (req, res) => {
-    try {
-        const logs = await AuditLog.findAll({ order: [['createdAt', 'DESC']] });
-        res.status(200).json(logs);
-    } catch (error) {
-        res.status(500).json({ message: "Erro ao carregar logs de auditoria" });
-    }
-});
+// // Dashboard (Stats)
+// router.get('/admin/dashboard', authMiddleware, getAdminDashboard);
 
-export default router;
+// // Produtos (Estoque)
+// router.post('/products', authMiddleware, createProduct);
+// router.put('/products/:id', authMiddleware, updateProduct);
+// router.delete('/products/:id', authMiddleware, deleteProduct);
+
+// // Vendas/Pedidos
+// router.get('/admin/all-orders', authMiddleware, listAllOrdersAdmin);
+
+// // Lista de Clientes (Corrigido para suportar paginação se você quiser no futuro)
+// // Se você criou a função listUsersAdmin no UserController, use-a aqui. 
+// // Caso contrário, mantivemos a lógica, mas agora modularizada.
+// router.get('/admin/users', authMiddleware, listUsersAdmin);
+
+// // Auditoria (Corrigido: Agora usa o Controller que respeita a paginação da Sidebar)
+// router.get('/admin/logs', authMiddleware, listLogs);
+
+// export default router;

@@ -1,9 +1,9 @@
 import User from '../models/UserModel';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import sequelize from '../config/database';
 
 describe('Testes de Autenticação e Usuário', () => {
-  
+
   afterAll(async () => {
     await sequelize.close();
   });
@@ -12,7 +12,7 @@ describe('Testes de Autenticação e Usuário', () => {
     // Usamos um timestamp para o e-mail nunca ser igual ao de rodadas anteriores
     const uniqueEmail = `teste${Date.now()}@codewear.com`;
     const password = 'senha_segura_123';
-    
+
     const user = await User.create({
       name: 'User Teste',
       email: uniqueEmail,
@@ -28,7 +28,7 @@ describe('Testes de Autenticação e Usuário', () => {
 
   test('Não deve permitir o cadastro de dois usuários com o mesmo E-mail', async () => {
     const duplicateEmail = `duplicado${Date.now()}@codewear.com`;
-    
+
     // Criamos o primeiro
     await User.create({
       name: 'Primeiro',

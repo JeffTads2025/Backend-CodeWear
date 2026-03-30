@@ -1,31 +1,32 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AuthRequest } from '../types'; // Importando seu Type Global
+import { AuthRequest } from '../types';
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   
-  // 1. Validação de presença do token (Rubrica: Autenticação)
-  if (!authHeader) return res.status(401).json({ message: "Login necessário" });
+  // LOG PARA DEBUG: Verifique o terminal do seu Node
+  if (!authHeader) {
+    console.log("ALERTA: Requisição sem header de autorização.");
+    return res.status(401).json({ message: "Login necessário" });
+  }
 
   const token = authHeader.split(' ')[1];
 
   try {
-    // 2. Tipagem do payload do JWT para evitar o 'any'
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'chave_secreta_padrao') as { 
       id: number; 
       name: string; 
       role: 'admin' | 'client' 
     };
 
-    // 3. Preenche o req.user usando a interface AuthRequest (Sem usar 'as any')
     req.user = {
       id: decoded.id,
       name: decoded.name,
       role: decoded.role
     };
 
-    // 4. Lógica de Proteção de Rota (Exigência para Admin/Dashboard)
+    // Proteção de rotas administrativas
     const isAdminRoute = req.originalUrl.includes('admin') || 
                          (req.originalUrl.includes('products') && req.method !== 'GET');
 
@@ -35,7 +36,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 
     next();
   } catch (error) {
-    // 5. Retorno coerente com o status (Rubrica: Código Limpo)
+    console.log("ERRO JWT:", error);
     return res.status(401).json({ message: "Sessão expirada ou inválida" });
   }
 };
