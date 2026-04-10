@@ -43,6 +43,30 @@ export const addToCart = async (req: AuthRequest, res: Response): Promise<Respon
 export const listCart = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const userId = req.user!.id;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 0;
+
+        if (limit > 0) {
+            const offset = (page - 1) * limit;
+            const { count, rows } = await Cart.findAndCountAll({
+                where: { userId },
+                limit,
+                offset,
+                include: [{
+                    model: Product,
+                    attributes: ['id', 'name', 'price', 'image_url', 'stock']
+                }],
+                order: [['createdAt', 'ASC']]
+            });
+
+            return res.status(200).json({
+                items: rows,
+                totalPages: Math.ceil(count / limit),
+                currentPage: page,
+                totalItems: count
+            });
+        }
+
         const items = await Cart.findAll({
             where: { userId },
             include: [{
@@ -54,6 +78,41 @@ export const listCart = async (req: AuthRequest, res: Response): Promise<Respons
         return res.status(200).json(items);
     } catch (error) {
         return res.status(500).json({ message: "Erro ao listar carrinho" });
+    }
+};
+
+export const updateCartItem = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const { id } = req.params;
+        const { quantity } = req.body;
+        const userId = req.user!.id;
+
+        if (typeof quantity !== 'number' || quantity < 1) {
+            return res.status(400).json({ message: "Quantidade deve ser maior que zero" });
+        }
+
+        const item = await Cart.findOne({ where: { id, userId } });
+
+        if (!item) {
+            return res.status(404).json({ message: "Item não encontrado no carrinho" });
+        }
+
+        const product = await Product.findByPk(item.productId);
+
+        if (!product) {
+            return res.status(404).json({ message: "Produto não encontrado" });
+        }
+
+        if (product.stock < quantity) {
+            return res.status(400).json({ message: "Quantidade solicitada superior ao estoque disponível." });
+        }
+
+        item.quantity = quantity;
+        await item.save();
+
+        return res.status(200).json(item);
+    } catch (error) {
+        return res.status(500).json({ message: "Erro ao atualizar item do carrinho" });
     }
 };
 

@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Op } from 'sequelize';
+import { Op, type WhereOptions } from 'sequelize';
 import Cart from '../models/CartModel';
 import Product from '../models/ProductModel';
 import Order from '../models/OrderModel';
@@ -8,6 +8,12 @@ import User from '../models/UserModel';
 import sequelize from '../config/database';
 import { AuthRequest } from '../types';
 import { getActiveClientWhereClause } from '../utils/accountCancellation';
+
+interface CheckoutOrderItem {
+    productId: number;
+    quantity: number;
+    price: number;
+}
 
 // 1. FINALIZAR COMPRA (CHECKOUT) - MANTIDO ORIGINAL
 export const checkout = async (req: AuthRequest, res: Response) => {
@@ -24,7 +30,7 @@ export const checkout = async (req: AuthRequest, res: Response) => {
         if (!finalAddress) return res.status(400).json({ message: "Endereço necessário" });
 
         let totalValue = 0;
-        const itemsToOrder = [];
+        const itemsToOrder: CheckoutOrderItem[] = [];
 
         for (const item of cartItems) {
             const product = await Product.findByPk(item.productId, { transaction: t });
@@ -66,9 +72,10 @@ export const checkout = async (req: AuthRequest, res: Response) => {
         await t.commit();
 
         return res.status(201).json({ message: "Compra finalizada!", orderId: order.id });
-    } catch (error: any) {
+    } catch (error) {
         await t.rollback();
-        return res.status(400).json({ message: error.message || 'Erro no checkout' });
+        const message = error instanceof Error ? error.message : 'Erro no checkout';
+        return res.status(400).json({ message });
     }
 };
 
@@ -100,22 +107,25 @@ export const listAllOrdersAdmin = async (req: AuthRequest, res: Response) => {
         const { page, date, month, year, limit: queryLimit } = req.query;
         const limit = queryLimit ? Number(queryLimit) : 5;
         const offset = page ? (Number(page) - 1) * limit : 0;
-        const whereClause: any = {};
-
-        if (date) {
-            whereClause.createdAt = {
-                [Op.between]: [
-                    new Date(`${date} 00:00:00`),
-                    new Date(`${date} 23:59:59`)
-                ]
-            };
-        }
-        // Se não tem data específica, mas tem mês/ano (Exportação Mensal)
-        else if (month && year) {
-            const startDate = new Date(Number(year), Number(month) - 1, 1, 0, 0, 0);
-            const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
-            whereClause.createdAt = { [Op.between]: [startDate, endDate] };
-        }
+        const whereClause: WhereOptions = date
+            ? {
+                createdAt: {
+                    [Op.between]: [
+                        new Date(`${date} 00:00:00`),
+                        new Date(`${date} 23:59:59`)
+                    ]
+                }
+            }
+            : month && year
+                ? {
+                    createdAt: {
+                        [Op.between]: [
+                            new Date(Number(year), Number(month) - 1, 1, 0, 0, 0),
+                            new Date(Number(year), Number(month), 0, 23, 59, 59)
+                        ]
+                    }
+                }
+                : {};
 
         const { count, rows } = await Order.findAndCountAll({
             where: whereClause,
@@ -215,9 +225,11 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
 
         await product.destroy();
         return res.status(200).json({ message: "Produto deletado com sucesso! 🗑️" });
-    } catch (error: any) {
-        const isForeignKey = error.name === 'SequelizeForeignKeyConstraintError' ||
-            (error.message && error.message.includes('foreign key constraint fails'));
+    } catch (error) {
+        const isForeignKey = error instanceof Error && (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            error.message.includes('foreign key constraint fails')
+        );
 
         if (isForeignKey) {
             return res.status(400).json({
@@ -225,5 +237,66 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
             });
         }
         return res.status(500).json({ message: "Erro interno ao deletar produto" });
+    }
+};
+
+export const updateOrder = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { status, address, paymentMethod } = req.body;
+
+        const order = await Order.findByPk(id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Pedido não encontrado" });
+        }
+
+        const isOwner = order.userId === req.user!.id;
+        const isAdmin = req.user!.role === 'admin';
+
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ message: "Sem permissão para atualizar este pedido" });
+        }
+
+        await order.update({
+            status: status ?? order.status,
+            address: address ?? order.address,
+            paymentMethod: paymentMethod ?? order.paymentMethod,
+        });
+
+        return res.status(200).json({ message: "Pedido atualizado com sucesso", order });
+    } catch (error) {
+        return res.status(500).json({ message: "Erro ao atualizar pedido" });
+    }
+};
+
+export const deleteOrder = async (req: AuthRequest, res: Response) => {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+
+        const order = await Order.findByPk(id, { transaction: t });
+
+        if (!order) {
+            await t.rollback();
+            return res.status(404).json({ message: "Pedido não encontrado" });
+        }
+
+        const isOwner = order.userId === req.user!.id;
+        const isAdmin = req.user!.role === 'admin';
+
+        if (!isOwner && !isAdmin) {
+            await t.rollback();
+            return res.status(403).json({ message: "Sem permissão para remover este pedido" });
+        }
+
+        await OrderItem.destroy({ where: { orderId: order.id }, transaction: t });
+        await order.destroy({ transaction: t });
+        await t.commit();
+
+        return res.status(200).json({ message: "Pedido removido com sucesso" });
+    } catch (error) {
+        await t.rollback();
+        return res.status(500).json({ message: "Erro ao remover pedido" });
     }
 };

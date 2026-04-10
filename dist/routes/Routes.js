@@ -19,9 +19,12 @@ router.put('/users/profile', authMiddleware_1.authMiddleware, UserController_1.u
 router.delete('/users/me', authMiddleware_1.authMiddleware, UserController_1.cancelMyAccount);
 router.post('/cart', authMiddleware_1.authMiddleware, CartController_1.addToCart);
 router.get('/cart', authMiddleware_1.authMiddleware, CartController_1.listCart);
+router.put('/cart/:id', authMiddleware_1.authMiddleware, CartController_1.updateCartItem);
 router.delete('/cart/:id', authMiddleware_1.authMiddleware, CartController_1.removeItem);
 router.post('/checkout', authMiddleware_1.authMiddleware, OrderController_1.checkout);
 router.get('/orders', authMiddleware_1.authMiddleware, OrderController_1.listMyOrders);
+router.put('/orders/:id', authMiddleware_1.authMiddleware, OrderController_1.updateOrder);
+router.delete('/orders/:id', authMiddleware_1.authMiddleware, OrderController_1.deleteOrder);
 // --- ROTAS DO ADMIN ---
 // Dashboard (Stats)
 router.get('/admin/dashboard', authMiddleware_1.authMiddleware, OrderController_1.getAdminDashboard);

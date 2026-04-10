@@ -42,9 +42,8 @@ describe('Testes de Autenticação e Usuário', () => {
       address: 'Rua Teste, 123'
     });
 
-    try {
-      // Tentamos criar o segundo com o MESMO e-mail
-      await User.create({
+    await expect(
+      User.create({
         name: 'Segundo',
         email: duplicateEmail,
         password: '123',
@@ -52,10 +51,7 @@ describe('Testes de Autenticação e Usuário', () => {
         role: 'client',
         phone: '11888888888',
         address: 'Rua Teste, 456'
-      });
-    } catch (error: unknown) {
-      const err = error as Error;
-      expect(err.name).toBe('SequelizeUniqueConstraintError');
-    }
+      })
+    ).rejects.toMatchObject({ name: 'SequelizeUniqueConstraintError' });
   });
 });

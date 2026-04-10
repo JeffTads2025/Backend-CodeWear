@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.listProducts = exports.getAdminDashboard = exports.listAllOrdersAdmin = exports.listMyOrders = exports.checkout = void 0;
+exports.deleteOrder = exports.updateOrder = exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.listProducts = exports.getAdminDashboard = exports.listAllOrdersAdmin = exports.listMyOrders = exports.checkout = void 0;
 const sequelize_1 = require("sequelize");
 const CartModel_1 = __importDefault(require("../models/CartModel"));
 const ProductModel_1 = __importDefault(require("../models/ProductModel"));
@@ -66,7 +66,8 @@ const checkout = async (req, res) => {
     }
     catch (error) {
         await t.rollback();
-        return res.status(400).json({ message: error.message || 'Erro no checkout' });
+        const message = error instanceof Error ? error.message : 'Erro no checkout';
+        return res.status(400).json({ message });
     }
 };
 exports.checkout = checkout;
@@ -97,21 +98,25 @@ const listAllOrdersAdmin = async (req, res) => {
         const { page, date, month, year, limit: queryLimit } = req.query;
         const limit = queryLimit ? Number(queryLimit) : 5;
         const offset = page ? (Number(page) - 1) * limit : 0;
-        const whereClause = {};
-        if (date) {
-            whereClause.createdAt = {
-                [sequelize_1.Op.between]: [
-                    new Date(`${date} 00:00:00`),
-                    new Date(`${date} 23:59:59`)
-                ]
-            };
-        }
-        // Se não tem data específica, mas tem mês/ano (Exportação Mensal)
-        else if (month && year) {
-            const startDate = new Date(Number(year), Number(month) - 1, 1, 0, 0, 0);
-            const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
-            whereClause.createdAt = { [sequelize_1.Op.between]: [startDate, endDate] };
-        }
+        const whereClause = date
+            ? {
+                createdAt: {
+                    [sequelize_1.Op.between]: [
+                        new Date(`${date} 00:00:00`),
+                        new Date(`${date} 23:59:59`)
+                    ]
+                }
+            }
+            : month && year
+                ? {
+                    createdAt: {
+                        [sequelize_1.Op.between]: [
+                            new Date(Number(year), Number(month) - 1, 1, 0, 0, 0),
+                            new Date(Number(year), Number(month), 0, 23, 59, 59)
+                        ]
+                    }
+                }
+                : {};
         const { count, rows } = await OrderModel_1.default.findAndCountAll({
             where: whereClause,
             limit,
@@ -211,8 +216,8 @@ const deleteProduct = async (req, res) => {
         return res.status(200).json({ message: "Produto deletado com sucesso! 🗑️" });
     }
     catch (error) {
-        const isForeignKey = error.name === 'SequelizeForeignKeyConstraintError' ||
-            (error.message && error.message.includes('foreign key constraint fails'));
+        const isForeignKey = error instanceof Error && (error.name === 'SequelizeForeignKeyConstraintError' ||
+            error.message.includes('foreign key constraint fails'));
         if (isForeignKey) {
             return res.status(400).json({
                 message: "Não é possível excluir: este produto está atrelado a uma compra já realizada. 🚫"
@@ -222,3 +227,54 @@ const deleteProduct = async (req, res) => {
     }
 };
 exports.deleteProduct = deleteProduct;
+const updateOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, address, paymentMethod } = req.body;
+        const order = await OrderModel_1.default.findByPk(id);
+        if (!order) {
+            return res.status(404).json({ message: "Pedido não encontrado" });
+        }
+        const isOwner = order.userId === req.user.id;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ message: "Sem permissão para atualizar este pedido" });
+        }
+        await order.update({
+            status: status ?? order.status,
+            address: address ?? order.address,
+            paymentMethod: paymentMethod ?? order.paymentMethod,
+        });
+        return res.status(200).json({ message: "Pedido atualizado com sucesso", order });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Erro ao atualizar pedido" });
+    }
+};
+exports.updateOrder = updateOrder;
+const deleteOrder = async (req, res) => {
+    const t = await database_1.default.transaction();
+    try {
+        const { id } = req.params;
+        const order = await OrderModel_1.default.findByPk(id, { transaction: t });
+        if (!order) {
+            await t.rollback();
+            return res.status(404).json({ message: "Pedido não encontrado" });
+        }
+        const isOwner = order.userId === req.user.id;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin) {
+            await t.rollback();
+            return res.status(403).json({ message: "Sem permissão para remover este pedido" });
+        }
+        await OrderItemModel_1.default.destroy({ where: { orderId: order.id }, transaction: t });
+        await order.destroy({ transaction: t });
+        await t.commit();
+        return res.status(200).json({ message: "Pedido removido com sucesso" });
+    }
+    catch (error) {
+        await t.rollback();
+        return res.status(500).json({ message: "Erro ao remover pedido" });
+    }
+};
+exports.deleteOrder = deleteOrder;

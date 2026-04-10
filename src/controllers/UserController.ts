@@ -1,15 +1,26 @@
-import { Response, Request } from 'express';
+import { Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { Op, fn, col, where } from 'sequelize';
+import { Op, fn, col, where, type WhereOptions } from 'sequelize';
 import User from '../models/UserModel';
 import {
     buildCancelledAccountData,
+    CANCELLED_EMAIL_DOMAIN,
     getActiveClientWhereClause,
     isCancelledEmail,
 } from '../utils/accountCancellation';
 import { validateEmail, validateCPF, validatePasswordLevel } from '../utils/validators';
 import { AuthRequest } from '../types';
+
+interface UserUpdatePayload {
+    name?: string;
+    password?: string;
+    phone?: string;
+    address?: string;
+    cpf?: string;
+}
+
+type ActiveClientWhereClause = ReturnType<typeof getActiveClientWhereClause>;
 
 /**
  * CADASTRO DE USUÁRIO
@@ -45,7 +56,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
 
         return res.status(201).json({ message: "Usuário criado com sucesso!", id: newUser.id });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("ERRO NO CADASTRO:", error);
         return res.status(500).json({ message: "Erro interno ao criar usuário." });
     }
@@ -130,7 +141,7 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
         if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
         if (isCancelledEmail(user.email)) return res.status(404).json({ message: "Usuário não encontrado." });
 
-        const updateData: any = { name, phone, address };
+        const updateData: UserUpdatePayload = { name, phone, address };
 
         if (cpf) {
             updateData.cpf = cpf.replace(/\D/g, ''); // Limpa o CPF
@@ -196,17 +207,24 @@ export const listUsersAdmin = async (req: AuthRequest, res: Response) => {
         const activeClientWhereClause = getActiveClientWhereClause();
         const totalCountInDB = await User.count({ where: activeClientWhereClause });
 
-        const whereClause: any = { ...activeClientWhereClause };
-
-        if (search) {
-            const searchLower = `%${search.toLowerCase()}%`;
-
-            whereClause[Op.or] = [
-                where(fn('lower', col('name')), { [Op.like]: searchLower }),
-                where(fn('lower', col('email')), { [Op.like]: searchLower }),
-                where(fn('lower', col('cpf')), { [Op.like]: searchLower })
-            ];
-        }
+        const whereClause: WhereOptions = search
+            ? {
+                role: 'client',
+                email: {
+                    [Op.notLike]: `%${CANCELLED_EMAIL_DOMAIN}`,
+                },
+                [Op.or]: [
+                    where(fn('lower', col('name')), { [Op.like]: `%${search.toLowerCase()}%` }),
+                    where(fn('lower', col('email')), { [Op.like]: `%${search.toLowerCase()}%` }),
+                    where(fn('lower', col('cpf')), { [Op.like]: `%${search.toLowerCase()}%` })
+                ]
+            }
+            : {
+                role: 'client',
+                email: {
+                    [Op.notLike]: `%${CANCELLED_EMAIL_DOMAIN}`,
+                },
+            };
 
         const { count, rows } = await User.findAndCountAll({
             where: whereClause,

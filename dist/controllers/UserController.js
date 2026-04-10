@@ -180,15 +180,24 @@ const listUsersAdmin = async (req, res) => {
         // Conta o total absoluto de clientes no banco
         const activeClientWhereClause = (0, accountCancellation_1.getActiveClientWhereClause)();
         const totalCountInDB = await UserModel_1.default.count({ where: activeClientWhereClause });
-        const whereClause = { ...activeClientWhereClause };
-        if (search) {
-            const searchLower = `%${search.toLowerCase()}%`;
-            whereClause[sequelize_1.Op.or] = [
-                (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('name')), { [sequelize_1.Op.like]: searchLower }),
-                (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('email')), { [sequelize_1.Op.like]: searchLower }),
-                (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('cpf')), { [sequelize_1.Op.like]: searchLower })
-            ];
-        }
+        const whereClause = search
+            ? {
+                role: 'client',
+                email: {
+                    [sequelize_1.Op.notLike]: `%${accountCancellation_1.CANCELLED_EMAIL_DOMAIN}`,
+                },
+                [sequelize_1.Op.or]: [
+                    (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('name')), { [sequelize_1.Op.like]: `%${search.toLowerCase()}%` }),
+                    (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('email')), { [sequelize_1.Op.like]: `%${search.toLowerCase()}%` }),
+                    (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('cpf')), { [sequelize_1.Op.like]: `%${search.toLowerCase()}%` })
+                ]
+            }
+            : {
+                role: 'client',
+                email: {
+                    [sequelize_1.Op.notLike]: `%${accountCancellation_1.CANCELLED_EMAIL_DOMAIN}`,
+                },
+            };
         const { count, rows } = await UserModel_1.default.findAndCountAll({
             where: whereClause,
             limit,

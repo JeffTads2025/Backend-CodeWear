@@ -39,21 +39,14 @@ describe('Testes de Autenticação e Usuário', () => {
             phone: '11999999999',
             address: 'Rua Teste, 123'
         });
-        try {
-            // Tentamos criar o segundo com o MESMO e-mail
-            await UserModel_1.default.create({
-                name: 'Segundo',
-                email: duplicateEmail,
-                password: '123',
-                cpf: `cpf2-${Date.now()}`,
-                role: 'client',
-                phone: '11888888888',
-                address: 'Rua Teste, 456'
-            });
-        }
-        catch (error) {
-            const err = error;
-            expect(err.name).toBe('SequelizeUniqueConstraintError');
-        }
+        await expect(UserModel_1.default.create({
+            name: 'Segundo',
+            email: duplicateEmail,
+            password: '123',
+            cpf: `cpf2-${Date.now()}`,
+            role: 'client',
+            phone: '11888888888',
+            address: 'Rua Teste, 456'
+        })).rejects.toMatchObject({ name: 'SequelizeUniqueConstraintError' });
     });
 });

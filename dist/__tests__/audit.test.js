@@ -23,16 +23,8 @@ describe('Testes de Auditoria (Logs)', () => {
         expect(log.adminName).toBe('Admin Jeff');
     });
     test('Deve exigir que os campos obrigatórios sejam informados', async () => {
-        try {
-            // Tentando criar sem os campos obrigatórios (forçando o erro de validação)
-            // Usamos o type casting apenas para simular o erro, sem usar 'any'
-            await AuditLogModel_1.default.create({
-                adminName: 'Admin'
-            });
-        }
-        catch (error) {
-            const err = error;
-            expect(err.name).toBe('SequelizeValidationError');
-        }
+        await expect(AuditLogModel_1.default.create({
+            adminName: 'Admin'
+        })).rejects.toMatchObject({ name: 'SequelizeValidationError' });
     });
 });

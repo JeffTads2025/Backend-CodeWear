@@ -182,18 +182,24 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
 
         const oldData = { name: product.name, price: product.price, stock: product.stock, image_url: product.image_url };
 
+        const nextName = name !== undefined ? name : product.name;
+        const nextPrice = price !== undefined ? price : product.price;
+        const nextStock = stock !== undefined ? stock : product.stock;
+        const nextImageUrl = image_url !== undefined ? image_url : product.image_url;
+
         await product.update({
-            name,
-            price,
-            stock,
-            image_url: image_url !== undefined ? image_url : product.image_url
+            name: nextName,
+            price: nextPrice,
+            stock: nextStock,
+            image_url: nextImageUrl
         });
 
         // LOG DE AUDITORIA
         let details = `Atualizou produto "${oldData.name}"`;
-        if (oldData.price !== price) details += ` - Preço: R$ ${oldData.price} → R$ ${price}`;
-        if (oldData.stock !== stock) details += ` - Estoque: ${oldData.stock} → ${stock}`;
-        if (oldData.image_url !== image_url) details += ` - Imagem alterada`;
+        if (name !== undefined && oldData.name !== nextName) details += ` - Nome: ${oldData.name} → ${nextName}`;
+        if (price !== undefined && oldData.price !== nextPrice) details += ` - Preço: R$ ${oldData.price} → R$ ${nextPrice}`;
+        if (stock !== undefined && oldData.stock !== nextStock) details += ` - Estoque: ${oldData.stock} → ${nextStock}`;
+        if (image_url !== undefined && oldData.image_url !== nextImageUrl) details += ` - Imagem alterada`;
 
         await AuditLog.create({
             adminId: req.user!.id,
@@ -224,12 +230,24 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
             adminId: req.user!.id,
             adminName: req.user!.name,
             action: 'DELETE_PRODUCT',
-            details: `Deletou produto "${product.name}" (ID: ${id})`
+            details: `Produto: "${product.name}"`
         });
 
         await product.destroy();
         return res.status(200).json({ message: "Produto deletado com sucesso" });
     } catch (error) {
+        const isForeignKeyConstraint = error instanceof Error && (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            error.message.includes('foreign key constraint fails') ||
+            error.message.includes('Cannot delete or update a parent row')
+        );
+
+        if (isForeignKeyConstraint) {
+            return res.status(400).json({
+                message: 'Não é possível excluir este produto porque ele está vinculado a registros existentes, como itens no carrinho ou pedidos.'
+            });
+        }
+
         const message = error instanceof Error ? error.message : "Erro ao deletar produto";
         return res.status(500).json({ message });
     }
