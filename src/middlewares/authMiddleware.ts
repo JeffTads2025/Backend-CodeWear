@@ -1,8 +1,10 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../types';
+import User from '../models/UserModel';
+import { isCancelledEmail } from '../utils/accountCancellation';
 
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   
   // LOG PARA DEBUG: Verifique o terminal do seu Node
@@ -20,10 +22,18 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       role: 'admin' | 'client' 
     };
 
+    const currentUser = await User.findByPk(decoded.id, {
+      attributes: ['id', 'name', 'role', 'email']
+    });
+
+    if (!currentUser || isCancelledEmail(currentUser.email)) {
+      return res.status(401).json({ message: 'Conta cancelada ou indisponível' });
+    }
+
     req.user = {
-      id: decoded.id,
-      name: decoded.name,
-      role: decoded.role
+      id: currentUser.id,
+      name: currentUser.name,
+      role: currentUser.role
     };
 
     // Proteção de rotas administrativas

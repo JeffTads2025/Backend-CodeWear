@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "lib": ["es2020"],
+    "lib": [
+      "es2020"
+    ],
     "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
@@ -10,8 +12,16 @@
     "strict": true,
     "skipLibCheck": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": [
+      "jest",
+      "node"
+    ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

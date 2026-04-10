@@ -1,7 +1,7 @@
 import { Router } from 'express';
 // Importação dos Controllers
 import { listProducts, createProduct, updateProduct, deleteProduct } from '../controllers/ProductController';
-import { createUser, loginUser, getMe, updateUser, listUsersAdmin } from '../controllers/UserController';
+import { cancelMyAccount, createUser, loginUser, getMe, updateUser, listUsersAdmin } from '../controllers/UserController';
 import { addToCart, listCart, removeItem } from '../controllers/CartController';
 import { checkout, listMyOrders, getAdminDashboard, listAllOrdersAdmin } from '../controllers/OrderController';
 import { listLogs } from '../controllers/AuditController'; // <-- Importante: Controller de Auditoria
@@ -17,6 +17,7 @@ router.post('/login', loginUser);
 // --- ROTAS DO CLIENTE ---
 router.get('/me', authMiddleware, getMe);
 router.put('/users/profile', authMiddleware, updateUser);
+router.delete('/users/me', authMiddleware, cancelMyAccount);
 router.post('/cart', authMiddleware, addToCart);
 router.get('/cart', authMiddleware, listCart);
 router.delete('/cart/:id', authMiddleware, removeItem);

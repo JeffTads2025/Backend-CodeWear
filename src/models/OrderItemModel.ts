@@ -1,7 +1,5 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database';
-import Order from './OrderModel';
-import Product from './ProductModel';
 
 class OrderItem extends Model {
     public id!: number;
@@ -22,9 +20,5 @@ OrderItem.init({
     tableName: 'order_items',
     timestamps: true
 });
-
-OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
-OrderItem.belongsTo(Product, { foreignKey: 'productId' });
-Order.hasMany(OrderItem, { foreignKey: 'orderId' });
 
 export default OrderItem;

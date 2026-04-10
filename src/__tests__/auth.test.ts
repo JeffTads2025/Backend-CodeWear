@@ -18,7 +18,9 @@ describe('Testes de Autenticação e Usuário', () => {
       email: uniqueEmail,
       password: password,
       cpf: `cpf-${Date.now()}`, // CPF único também
-      role: 'client'
+      role: 'client',
+      phone: '11999999999',
+      address: 'Rua Teste, 123'
     });
 
     expect(user.password).not.toBe(password);
@@ -35,7 +37,9 @@ describe('Testes de Autenticação e Usuário', () => {
       email: duplicateEmail,
       password: '123',
       cpf: `cpf1-${Date.now()}`,
-      role: 'client'
+      role: 'client',
+      phone: '11999999999',
+      address: 'Rua Teste, 123'
     });
 
     try {
@@ -45,7 +49,9 @@ describe('Testes de Autenticação e Usuário', () => {
         email: duplicateEmail,
         password: '123',
         cpf: `cpf2-${Date.now()}`,
-        role: 'client'
+        role: 'client',
+        phone: '11888888888',
+        address: 'Rua Teste, 456'
       });
     } catch (error: unknown) {
       const err = error as Error;

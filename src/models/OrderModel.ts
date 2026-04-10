@@ -1,6 +1,5 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database';
-import User from './UserModel';
 
 class Order extends Model {
     public id!: number;
@@ -23,9 +22,5 @@ Order.init({
     tableName: 'orders',
     timestamps: true
 });
-
-// Associação: Um pedido pertence a um usuário
-Order.belongsTo(User, { foreignKey: 'userId' });
-User.hasMany(Order, { foreignKey: 'userId' });
 
 export default Order;

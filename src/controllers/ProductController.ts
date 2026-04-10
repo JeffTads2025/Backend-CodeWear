@@ -5,6 +5,7 @@ import Product from '../models/ProductModel';
 import Order from '../models/OrderModel';
 import OrderItem from '../models/OrderItemModel';
 import User from '../models/UserModel';
+import AuditLog from '../models/AuditLogModel';
 import sequelize from '../config/database';
 import { AuthRequest } from '../types';
 
@@ -140,7 +141,7 @@ export const listProducts = async (req: AuthRequest, res: Response) => {
 // CRIAR PRODUTO
 export const createProduct = async (req: AuthRequest, res: Response) => {
     try {
-        const { name, description, price, stock, category, sizes, image_url } = req.body;
+        const { name, price, stock, image_url } = req.body;
 
         if (!name || !price || stock === undefined) {
             return res.status(400).json({ message: "Nome, preço e estoque são obrigatórios" });
@@ -148,13 +149,19 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
 
         const product = await Product.create({
             name,
-            description,
             price,
             stock,
-            category,
-            sizes: sizes || 'P,M,G,GG',
             image_url: image_url || null
         });
+
+        // LOG DE AUDITORIA
+        await AuditLog.create({
+            adminId: req.user!.id,
+            adminName: req.user!.name,
+            action: 'CREATE_PRODUCT',
+            details: `Criou produto "${name}" com preço R$ ${price} e estoque ${stock}`
+        });
+
         return res.status(201).json({ message: "Produto criado com sucesso", product });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Erro ao criar produto";
@@ -166,22 +173,35 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
 export const updateProduct = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const { name, description, price, stock, category, sizes, image_url } = req.body;
+        const { name, price, stock, image_url } = req.body;
 
         const product = await Product.findByPk(id);
         if (!product) {
             return res.status(404).json({ message: "Produto não encontrado" });
         }
 
+        const oldData = { name: product.name, price: product.price, stock: product.stock, image_url: product.image_url };
+
         await product.update({
             name,
-            description,
             price,
             stock,
-            category,
-            sizes: sizes || product.sizes,
             image_url: image_url !== undefined ? image_url : product.image_url
         });
+
+        // LOG DE AUDITORIA
+        let details = `Atualizou produto "${oldData.name}"`;
+        if (oldData.price !== price) details += ` - Preço: R$ ${oldData.price} → R$ ${price}`;
+        if (oldData.stock !== stock) details += ` - Estoque: ${oldData.stock} → ${stock}`;
+        if (oldData.image_url !== image_url) details += ` - Imagem alterada`;
+
+        await AuditLog.create({
+            adminId: req.user!.id,
+            adminName: req.user!.name,
+            action: 'UPDATE_PRODUCT',
+            details
+        });
+
         return res.status(200).json({ message: "Produto atualizado com sucesso", product });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Erro ao atualizar produto";
@@ -198,6 +218,14 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
         if (!product) {
             return res.status(404).json({ message: "Produto não encontrado" });
         }
+
+        // LOG DE AUDITORIA ANTES DE DELETAR
+        await AuditLog.create({
+            adminId: req.user!.id,
+            adminName: req.user!.name,
+            action: 'DELETE_PRODUCT',
+            details: `Deletou produto "${product.name}" (ID: ${id})`
+        });
 
         await product.destroy();
         return res.status(200).json({ message: "Produto deletado com sucesso" });

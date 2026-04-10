@@ -1,36 +1,38 @@
-import { Response } from 'express';
-import { Op } from 'sequelize';
-import Cart from '../models/CartModel';
-import Product from '../models/ProductModel';
-import Order from '../models/OrderModel';
-import OrderItem from '../models/OrderItemModel';
-import User from '../models/UserModel';
-import sequelize from '../config/database';
-import { AuthRequest } from '../types';
-import { getActiveClientWhereClause } from '../utils/accountCancellation';
-
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.deleteProduct = exports.updateProduct = exports.createProduct = exports.listProducts = exports.getAdminDashboard = exports.listAllOrdersAdmin = exports.listMyOrders = exports.checkout = void 0;
+const sequelize_1 = require("sequelize");
+const CartModel_1 = __importDefault(require("../models/CartModel"));
+const ProductModel_1 = __importDefault(require("../models/ProductModel"));
+const OrderModel_1 = __importDefault(require("../models/OrderModel"));
+const OrderItemModel_1 = __importDefault(require("../models/OrderItemModel"));
+const UserModel_1 = __importDefault(require("../models/UserModel"));
+const database_1 = __importDefault(require("../config/database"));
+const accountCancellation_1 = require("../utils/accountCancellation");
 // 1. FINALIZAR COMPRA (CHECKOUT) - MANTIDO ORIGINAL
-export const checkout = async (req: AuthRequest, res: Response) => {
-    const t = await sequelize.transaction();
+const checkout = async (req, res) => {
+    const t = await database_1.default.transaction();
     try {
-        const userId = req.user!.id;
+        const userId = req.user.id;
         const { paymentMethod, address } = req.body;
-
-        const cartItems = await Cart.findAll({ where: { userId } });
-        if (cartItems.length === 0) throw new Error("Carrinho vazio");
-
-        const user = await User.findByPk(userId);
+        const cartItems = await CartModel_1.default.findAll({ where: { userId } });
+        if (cartItems.length === 0)
+            throw new Error("Carrinho vazio");
+        const user = await UserModel_1.default.findByPk(userId);
         const finalAddress = address || user?.address;
-        if (!finalAddress) return res.status(400).json({ message: "Endereço necessário" });
-
+        if (!finalAddress)
+            return res.status(400).json({ message: "Endereço necessário" });
         let totalValue = 0;
         const itemsToOrder = [];
-
         for (const item of cartItems) {
-            const product = await Product.findByPk(item.productId, { transaction: t });
-            if (!product) throw new Error(`Produto ${item.productId} não encontrado`);
-            if (product.stock < item.quantity) throw new Error(`Estoque insuficiente: ${product.name}`);
-
+            const product = await ProductModel_1.default.findByPk(item.productId, { transaction: t });
+            if (!product)
+                throw new Error(`Produto ${item.productId} não encontrado`);
+            if (product.stock < item.quantity)
+                throw new Error(`Estoque insuficiente: ${product.name}`);
             totalValue += item.quantity * product.price;
             itemsToOrder.push({
                 productId: item.productId,
@@ -38,73 +40,67 @@ export const checkout = async (req: AuthRequest, res: Response) => {
                 price: product.price
             });
         }
-
-        const order = await Order.create({
+        const order = await OrderModel_1.default.create({
             userId,
             totalValue,
             paymentMethod,
             address: finalAddress,
             status: 'pago'
         }, { transaction: t });
-
         for (const item of itemsToOrder) {
-            await OrderItem.create({
+            await OrderItemModel_1.default.create({
                 orderId: order.id,
                 productId: item.productId,
                 quantity: item.quantity,
                 priceAtPurchase: item.price
             }, { transaction: t });
-
-            await Product.decrement('stock', {
+            await ProductModel_1.default.decrement('stock', {
                 by: item.quantity,
                 where: { id: item.productId },
                 transaction: t
             });
         }
-
-        await Cart.destroy({ where: { userId }, transaction: t });
+        await CartModel_1.default.destroy({ where: { userId }, transaction: t });
         await t.commit();
-
         return res.status(201).json({ message: "Compra finalizada!", orderId: order.id });
-    } catch (error: any) {
+    }
+    catch (error) {
         await t.rollback();
         return res.status(400).json({ message: error.message || 'Erro no checkout' });
     }
 };
-
+exports.checkout = checkout;
 // 2. LISTAR PEDIDOS DO USUÁRIO LOGADO - MANTIDO ORIGINAL
-export const listMyOrders = async (req: AuthRequest, res: Response) => {
+const listMyOrders = async (req, res) => {
     try {
-        const userId = req.user!.id;
-        const page = parseInt(req.query.page as string) || 1;
+        const userId = req.user.id;
+        const page = parseInt(req.query.page) || 1;
         const limit = 5;
         const offset = (page - 1) * limit;
-
-        const { count, rows } = await Order.findAndCountAll({
+        const { count, rows } = await OrderModel_1.default.findAndCountAll({
             where: { userId },
             limit,
             offset,
-            include: [{ model: OrderItem, include: [Product] }],
+            include: [{ model: OrderItemModel_1.default, include: [ProductModel_1.default] }],
             order: [['createdAt', 'DESC']]
         });
-
         return res.status(200).json({ orders: rows, totalPages: Math.ceil(count / limit) });
-    } catch (error) {
+    }
+    catch (error) {
         return res.status(500).json({ message: "Erro ao listar pedidos" });
     }
 };
-
+exports.listMyOrders = listMyOrders;
 // 3. ADMIN: LISTAR TODOS OS PEDIDOS (ADICIONADO FILTRO DE MÊS PARA EXCEL)
-export const listAllOrdersAdmin = async (req: AuthRequest, res: Response) => {
+const listAllOrdersAdmin = async (req, res) => {
     try {
         const { page, date, month, year, limit: queryLimit } = req.query;
         const limit = queryLimit ? Number(queryLimit) : 5;
         const offset = page ? (Number(page) - 1) * limit : 0;
-        const whereClause: any = {};
-
+        const whereClause = {};
         if (date) {
             whereClause.createdAt = {
-                [Op.between]: [
+                [sequelize_1.Op.between]: [
                     new Date(`${date} 00:00:00`),
                     new Date(`${date} 23:59:59`)
                 ]
@@ -114,49 +110,44 @@ export const listAllOrdersAdmin = async (req: AuthRequest, res: Response) => {
         else if (month && year) {
             const startDate = new Date(Number(year), Number(month) - 1, 1, 0, 0, 0);
             const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
-            whereClause.createdAt = { [Op.between]: [startDate, endDate] };
+            whereClause.createdAt = { [sequelize_1.Op.between]: [startDate, endDate] };
         }
-
-        const { count, rows } = await Order.findAndCountAll({
+        const { count, rows } = await OrderModel_1.default.findAndCountAll({
             where: whereClause,
             limit,
             offset,
             include: [
-                { model: User, attributes: ['name', 'email'] },
-                { model: OrderItem, include: [{ model: Product, attributes: ['name'] }] }
+                { model: UserModel_1.default, attributes: ['name', 'email'] },
+                { model: OrderItemModel_1.default, include: [{ model: ProductModel_1.default, attributes: ['name'] }] }
             ],
             order: [['createdAt', 'DESC']]
         });
-
         return res.status(200).json({ orders: rows, totalPages: Math.ceil(count / limit) });
-    } catch (error) {
+    }
+    catch (error) {
         return res.status(500).json({ message: "Erro ao buscar vendas" });
     }
 };
-
+exports.listAllOrdersAdmin = listAllOrdersAdmin;
 // 4. ADMIN: DASHBOARD (CORRIGIDO PARA SEPARAR GERAL DE MENSAL)
-export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
+const getAdminDashboard = async (req, res) => {
     try {
         const { month, year } = req.query;
-
         // Faturamento de todo o tempo (Soma total histórica)
-        const totalRevenue = await Order.sum('totalValue') || 0;
-        const totalOrders = await Order.count() || 0;
-        const totalUsers = await User.count({ where: getActiveClientWhereClause() }) || 0;
-
+        const totalRevenue = await OrderModel_1.default.sum('totalValue') || 0;
+        const totalOrders = await OrderModel_1.default.count() || 0;
+        const totalUsers = await UserModel_1.default.count({ where: (0, accountCancellation_1.getActiveClientWhereClause)() }) || 0;
         // Cálculo específico do mês para o card "VENDAS NO MÊS"
         let monthlyRevenue = 0;
         if (month && year) {
             const startDate = new Date(Number(year), Number(month) - 1, 1, 0, 0, 0);
             const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
-
-            monthlyRevenue = await Order.sum('totalValue', {
+            monthlyRevenue = await OrderModel_1.default.sum('totalValue', {
                 where: {
-                    createdAt: { [Op.between]: [startDate, endDate] }
+                    createdAt: { [sequelize_1.Op.between]: [startDate, endDate] }
                 }
             }) || 0;
         }
-
         // Retorna tudo sem quebrar o que já existia
         return res.status(200).json({
             totalRevenue,
@@ -164,61 +155,64 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
             totalOrders,
             totalUsers
         });
-    } catch (error) {
+    }
+    catch (error) {
         console.error("Erro ao carregar dashboard:", error);
         return res.status(500).json({ message: "Erro no dashboard" });
     }
 };
-
+exports.getAdminDashboard = getAdminDashboard;
 // 5. ADMIN: LISTAR PRODUTOS - MANTIDO ORIGINAL
-export const listProducts = async (req: AuthRequest, res: Response) => {
+const listProducts = async (req, res) => {
     try {
-        const products = await Product.findAll({ order: [['createdAt', 'DESC']] });
+        const products = await ProductModel_1.default.findAll({ order: [['createdAt', 'DESC']] });
         return res.status(200).json(products);
-    } catch (error) {
+    }
+    catch (error) {
         return res.status(500).json({ message: "Erro ao listar produtos" });
     }
 };
-
+exports.listProducts = listProducts;
 // 6. ADMIN: CRIAR PRODUTO - MANTIDO ORIGINAL
-export const createProduct = async (req: AuthRequest, res: Response) => {
+const createProduct = async (req, res) => {
     try {
         const { name, price, stock, image_url } = req.body;
-        const product = await Product.create({ name, price, stock, image_url });
+        const product = await ProductModel_1.default.create({ name, price, stock, image_url });
         return res.status(201).json({ message: "Produto criado com sucesso!", product });
-    } catch (error) {
+    }
+    catch (error) {
         return res.status(500).json({ message: "Erro ao criar produto" });
     }
 };
-
+exports.createProduct = createProduct;
 // 7. ADMIN: ATUALIZAR PRODUTO - MANTIDO ORIGINAL
-export const updateProduct = async (req: AuthRequest, res: Response) => {
+const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const product = await Product.findByPk(id);
-        if (!product) return res.status(404).json({ message: "Produto não encontrado" });
-
+        const product = await ProductModel_1.default.findByPk(id);
+        if (!product)
+            return res.status(404).json({ message: "Produto não encontrado" });
         await product.update(req.body);
         return res.status(200).json({ message: "Atualizado com sucesso!", product });
-    } catch (error) {
+    }
+    catch (error) {
         return res.status(500).json({ message: "Erro ao atualizar" });
     }
 };
-
+exports.updateProduct = updateProduct;
 // 8. ADMIN: DELETAR PRODUTO - MANTIDO ORIGINAL
-export const deleteProduct = async (req: AuthRequest, res: Response) => {
+const deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const product = await Product.findByPk(id);
-
-        if (!product) return res.status(404).json({ message: "Produto não encontrado" });
-
+        const product = await ProductModel_1.default.findByPk(id);
+        if (!product)
+            return res.status(404).json({ message: "Produto não encontrado" });
         await product.destroy();
         return res.status(200).json({ message: "Produto deletado com sucesso! 🗑️" });
-    } catch (error: any) {
+    }
+    catch (error) {
         const isForeignKey = error.name === 'SequelizeForeignKeyConstraintError' ||
             (error.message && error.message.includes('foreign key constraint fails'));
-
         if (isForeignKey) {
             return res.status(400).json({
                 message: "Não é possível excluir: este produto está atrelado a uma compra já realizada. 🚫"
@@ -227,3 +221,4 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
         return res.status(500).json({ message: "Erro interno ao deletar produto" });
     }
 };
+exports.deleteProduct = deleteProduct;
