@@ -71,7 +71,7 @@ export const listCart = async (req: AuthRequest, res: Response): Promise<Respons
             where: { userId },
             include: [{
                 model: Product,
-                attributes: ['id', 'name', 'price', 'image_url', 'stock'] // Garante que o front receba o estoque atualizado
+                attributes: ['id', 'name', 'price', 'image_url', 'stock'] 
             }],
             order: [['createdAt', 'ASC']]
         });

@@ -18,7 +18,7 @@ AuditLog.init({
 }, {
   sequelize,
   tableName: 'audit_logs',
-  timestamps: true // Isso cria automaticamente as colunas 'createdAt' e 'updatedAt'
+  timestamps: true 
 });
 
 export default AuditLog;

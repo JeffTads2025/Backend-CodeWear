@@ -1,4 +1,4 @@
-// Interface em Inglês (CartItem)
+
 interface CartItem {
     name: string;
     price: number;
@@ -9,7 +9,7 @@ const calculateTotal = (items: CartItem[]): number => {
     return items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 };
 
-describe('Regras de Negócio: Cart System', () => {
+describe('Regras de Negócio: Sistema de Carrinho', () => {
     test('Deve somar o total de camisetas unissex no carrinho', () => {
         const items: CartItem[] = [
             { name: 'T-shirt Black', price: 80, quantity: 2 },

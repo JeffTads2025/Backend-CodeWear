@@ -9,7 +9,7 @@ export interface AuthRequest extends Request {
     };
 }
 
-// Interface para mensagens de erro/sucesso (opcional, mas ajuda a padronizar)
+// Interface para mensagens de erro/sucesso 
 export interface ApiResponse<TData = undefined, TError = string | undefined> {
     message: string;
     error?: TError;

@@ -7,7 +7,7 @@ import { isCancelledEmail } from '../utils/accountCancellation';
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   
-  // LOG PARA DEBUG: Verifique o terminal do seu Node
+ 
   if (!authHeader) {
     console.log("ALERTA: Requisição sem header de autorização.");
     return res.status(401).json({ message: "Login necessário" });

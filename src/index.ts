@@ -27,11 +27,7 @@ app.use(router);
 
 // --- Inicialização do Banco de Dados e Servidor ---
 
-/**
- * MANTENDO O CONTROLE AUTOMÁTICO:
- * O .sync() continua aqui para garantir que sua estrutura de tabelas 
- * esteja sempre atualizada conforme os seus arquivos de Model.
- */
+
 sequelize.sync()
     .then(() => {
         console.log('✅ Banco CodeWear sincronizado automaticamente!');

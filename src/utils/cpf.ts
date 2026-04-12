@@ -1,18 +1,18 @@
 export function validarCPF(cpf: string): boolean {
-    // Remove non-numeric characters
+    // Remove NÃO NUMERICOS
     cpf = cpf.replace(/\D/g, '');
 
-    // Check if it has 11 digits
+    // SE TEM 11 NUMEROS
     if (cpf.length !== 11) {
         return false;
     }
 
-    // Check if all digits are the same
+    // VERIFICA SE TODOS OS NUMEROS SÃO IGUASI 
     if (/^(\d)\1+$/.test(cpf)) {
         return false;
     }
 
-    // Validate first check digit
+    // 1 VALIDA PRIMEIRO 
     let sum = 0;
     for (let i = 0; i < 9; i++) {
         sum += parseInt(cpf[i]) * (10 - i);
@@ -23,7 +23,7 @@ export function validarCPF(cpf: string): boolean {
         return false;
     }
 
-    // Validate second check digit
+    // 2 VALIDAÇÃO 
     sum = 0;
     for (let i = 0; i < 10; i++) {
         sum += parseInt(cpf[i]) * (11 - i);

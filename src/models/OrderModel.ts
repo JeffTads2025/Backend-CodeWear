@@ -4,9 +4,9 @@ import sequelize from '../config/database';
 class Order extends Model {
     public id!: number;
     public totalValue!: number;
-    public status!: string; // Ex: 'pendente', 'pago', 'enviado'
-    public paymentMethod!: string; // Ex: 'cartao', 'pix', 'boleto'
-    public address!: string; // Onde entregar
+    public status!: string; 
+    public paymentMethod!: string; 
+    public address!: string; 
     public userId!: number;
 }
 

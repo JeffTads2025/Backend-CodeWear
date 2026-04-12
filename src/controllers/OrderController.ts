@@ -1,10 +1,11 @@
 import { Response } from 'express';
-import { Op, type WhereOptions } from 'sequelize';
+import { Op, type Transaction, type WhereOptions } from 'sequelize';
 import Cart from '../models/CartModel';
 import Product from '../models/ProductModel';
 import Order from '../models/OrderModel';
 import OrderItem from '../models/OrderItemModel';
 import User from '../models/UserModel';
+import AuditLog from '../models/AuditLogModel';
 import sequelize from '../config/database';
 import { AuthRequest } from '../types';
 import { getActiveClientWhereClause } from '../utils/accountCancellation';
@@ -13,6 +14,38 @@ interface CheckoutOrderItem {
     productId: number;
     quantity: number;
     price: number;
+}
+
+function canManageOrder(order: Order, req: AuthRequest): boolean {
+    const isOwner = order.userId === req.user!.id;
+    const isAdmin = req.user!.role === 'admin';
+
+    return isOwner || isAdmin;
+}
+
+async function getOrderCustomerName(order: Order, transaction: Transaction): Promise<string> {
+    const orderUser = await User.findByPk(order.userId, {
+        attributes: ['name'],
+        transaction
+    });
+
+    return orderUser?.name || `ID ${order.userId}`;
+}
+
+async function createDeleteOrderAuditLog(req: AuthRequest, order: Order, transaction: Transaction): Promise<void> {
+    const customerName = await getOrderCustomerName(order, transaction);
+
+    await AuditLog.create({
+        adminId: req.user!.id,
+        adminName: req.user!.name,
+        action: 'DELETE_ORDER',
+        details: `Pedido #${order.id} | Cliente ${customerName} | Total R$ ${Number(order.totalValue || 0).toFixed(2)}`
+    }, { transaction });
+}
+
+async function removeOrderWithItems(order: Order, transaction: Transaction): Promise<void> {
+    await OrderItem.destroy({ where: { orderId: order.id }, transaction });
+    await order.destroy({ transaction });
 }
 
 // 1. FINALIZAR COMPRA (CHECKOUT) - MANTIDO ORIGINAL
@@ -79,7 +112,7 @@ export const checkout = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 2. LISTAR PEDIDOS DO USUÁRIO LOGADO - MANTIDO ORIGINAL
+// 2. LISTAR PEDIDOS DO USUÁRIO LOGADO 
 export const listMyOrders = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user!.id;
@@ -101,7 +134,7 @@ export const listMyOrders = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 3. ADMIN: LISTAR TODOS OS PEDIDOS (ADICIONADO FILTRO DE MÊS PARA EXCEL)
+// 3. ADMIN: LISTAR TODOS OS PEDIDOS 
 export const listAllOrdersAdmin = async (req: AuthRequest, res: Response) => {
     try {
         const { page, date, month, year, limit: queryLimit } = req.query;
@@ -144,17 +177,17 @@ export const listAllOrdersAdmin = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 4. ADMIN: DASHBOARD (CORRIGIDO PARA SEPARAR GERAL DE MENSAL)
+// 4. ADMIN: DASHBOARD 
 export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
     try {
         const { month, year } = req.query;
 
-        // Faturamento de todo o tempo (Soma total histórica)
+        // TOTAL
         const totalRevenue = await Order.sum('totalValue') || 0;
         const totalOrders = await Order.count() || 0;
         const totalUsers = await User.count({ where: getActiveClientWhereClause() }) || 0;
 
-        // Cálculo específico do mês para o card "VENDAS NO MÊS"
+        // Cálculo específico do mês 
         let monthlyRevenue = 0;
         if (month && year) {
             const startDate = new Date(Number(year), Number(month) - 1, 1, 0, 0, 0);
@@ -167,10 +200,10 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
             }) || 0;
         }
 
-        // Retorna tudo sem quebrar o que já existia
+        // Retorna tudo 
         return res.status(200).json({
             totalRevenue,
-            monthlyRevenue, // <- Valor para o seu card de Março (4.844) ou Fev (0)
+            monthlyRevenue, 
             totalOrders,
             totalUsers
         });
@@ -180,7 +213,7 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 5. ADMIN: LISTAR PRODUTOS - MANTIDO ORIGINAL
+// 5. ADMIN: LISTAR PRODUTOS 
 export const listProducts = async (req: AuthRequest, res: Response) => {
     try {
         const products = await Product.findAll({ order: [['createdAt', 'DESC']] });
@@ -190,7 +223,7 @@ export const listProducts = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 6. ADMIN: CRIAR PRODUTO - MANTIDO ORIGINAL
+// 6. ADMIN: CRIAR PRODUTO
 export const createProduct = async (req: AuthRequest, res: Response) => {
     try {
         const { name, price, stock, image_url } = req.body;
@@ -201,7 +234,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 7. ADMIN: ATUALIZAR PRODUTO - MANTIDO ORIGINAL
+// 7. ADMIN: ATUALIZAR PRODUTO 
 export const updateProduct = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
@@ -215,7 +248,7 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// 8. ADMIN: DELETAR PRODUTO - MANTIDO ORIGINAL
+// 8. ADMIN: DELETAR PRODUTO 
 export const deleteProduct = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
@@ -282,16 +315,13 @@ export const deleteOrder = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ message: "Pedido não encontrado" });
         }
 
-        const isOwner = order.userId === req.user!.id;
-        const isAdmin = req.user!.role === 'admin';
-
-        if (!isOwner && !isAdmin) {
+        if (!canManageOrder(order, req)) {
             await t.rollback();
             return res.status(403).json({ message: "Sem permissão para remover este pedido" });
         }
 
-        await OrderItem.destroy({ where: { orderId: order.id }, transaction: t });
-        await order.destroy({ transaction: t });
+        await createDeleteOrderAuditLog(req, order, t);
+        await removeOrderWithItems(order, t);
         await t.commit();
 
         return res.status(200).json({ message: "Pedido removido com sucesso" });

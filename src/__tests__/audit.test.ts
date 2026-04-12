@@ -3,8 +3,17 @@ import sequelize from '../config/database';
 
 describe('Testes de Auditoria (Logs)', () => {
 
+  // Limpa logs de auditoria de teste após cada teste
+  afterEach(async () => {
+    await AuditLog.destroy({
+      where: {
+        adminName: 'Admin Jeff',
+        details: 'O produto Camiseta Unissex ID 10 foi removido do estoque.'
+      }
+    });
+  });
+
   afterAll(async () => {
-    // Fecha a conexão para o Jest encerrar corretamente
     await sequelize.close();
   });
 

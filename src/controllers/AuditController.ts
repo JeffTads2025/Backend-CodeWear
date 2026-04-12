@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Op } from 'sequelize'; // <--- Verifique se esta linha existe!
+import { Op } from 'sequelize'; 
 import AuditLog from '../models/AuditLogModel';
 
 export const listLogs = async (req: Request, res: Response) => {
@@ -12,8 +12,8 @@ export const listLogs = async (req: Request, res: Response) => {
     // Filtro de busca
     const whereClause = search ? {
       [Op.or]: [
-        { action: { [Op.like]: `%${search}%` } },     // Use Op.like para MySQL/SQLite
-        { adminName: { [Op.like]: `%${search}%` } },   // Use Op.iLike apenas para Postgres
+        { action: { [Op.like]: `%${search}%` } },     
+        { adminName: { [Op.like]: `%${search}%` } },   
         { details: { [Op.like]: `%${search}%` } }
       ]
     } : {};
@@ -31,7 +31,7 @@ export const listLogs = async (req: Request, res: Response) => {
       currentPage: page
     });
   } catch (error) {
-    // Isso ajudará você a ver o erro real no terminal do VS Code/Node
+    
     console.error("DETALHE DO ERRO 500:", error);
     return res.status(500).json({ message: "Erro interno no servidor" });
   }

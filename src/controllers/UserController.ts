@@ -22,33 +22,105 @@ interface UserUpdatePayload {
 
 type ActiveClientWhereClause = ReturnType<typeof getActiveClientWhereClause>;
 
+interface CreateUserPayload {
+    name?: string;
+    email?: string;
+    password?: string;
+    cpf?: string;
+    phone?: string;
+    address?: string;
+}
+
+interface NormalizedCreateUserPayload {
+    name: string;
+    email: string;
+    password: string;
+    cpf: string;
+    phone: string;
+    address: string;
+}
+
+function getAuthorizedUserId(req: AuthRequest): number | null {
+    return req.user?.id ?? null;
+}
+
+function normalizeCreateUserPayload(payload: CreateUserPayload): NormalizedCreateUserPayload | null {
+    const { name, email, password, cpf, phone, address } = payload;
+
+    if (!name || !email || !password || !cpf || !phone || !address) {
+        return null;
+    }
+
+    return {
+        name,
+        email: email.toLowerCase().trim(),
+        password: password.trim(),
+        cpf: cpf.replace(/\D/g, ''),
+        phone,
+        address,
+    };
+}
+
+async function findActiveUserById(userId: number): Promise<User | null> {
+    const user = await User.findByPk(userId);
+
+    if (!user || isCancelledEmail(user.email)) {
+        return null;
+    }
+
+    return user;
+}
+
+function buildUserListWhereClause(search: string): WhereOptions {
+    if (!search) {
+        return {
+            role: 'client',
+            email: {
+                [Op.notLike]: `%${CANCELLED_EMAIL_DOMAIN}`,
+            },
+        };
+    }
+
+    const normalizedSearch = search.toLowerCase();
+
+    return {
+        role: 'client',
+        email: {
+            [Op.notLike]: `%${CANCELLED_EMAIL_DOMAIN}`,
+        },
+        [Op.or]: [
+            where(fn('lower', col('name')), { [Op.like]: `%${normalizedSearch}%` }),
+            where(fn('lower', col('email')), { [Op.like]: `%${normalizedSearch}%` }),
+            where(fn('lower', col('cpf')), { [Op.like]: `%${normalizedSearch}%` })
+        ]
+    };
+}
+
 /**
  * CADASTRO DE USUÁRIO
  */
 export const createUser = async (req: AuthRequest, res: Response) => {
     try {
-        const { name, email, password, cpf, phone, address } = req.body;
+        const normalizedPayload = normalizeCreateUserPayload(req.body as CreateUserPayload);
 
-        if (!name || !email || !password || !cpf || !phone || !address) {
+        if (!normalizedPayload) {
             return res.status(400).json({ message: "Todos os campos são obrigatórios." });
         }
 
-        const cleanEmail = email.toLowerCase().trim();
-        const cleanCPF = cpf.replace(/\D/g, '');
-        const cleanPassword = password.trim();
+        const { name, email, password, cpf, phone, address } = normalizedPayload;
 
-        if (!validateEmail(cleanEmail)) return res.status(400).json({ message: "Formato de e-mail inválido." });
-        if (!validateCPF(cleanCPF)) return res.status(400).json({ message: "CPF inválido." });
-        if (!validatePasswordLevel(cleanPassword)) return res.status(400).json({ message: "Senha muito fraca." });
+        if (!validateEmail(email)) return res.status(400).json({ message: "Formato de e-mail inválido." });
+        if (!validateCPF(cpf)) return res.status(400).json({ message: "CPF inválido." });
+        if (!validatePasswordLevel(password)) return res.status(400).json({ message: "Senha muito fraca." });
 
-        const userExists = await User.findOne({ where: { email: cleanEmail } });
+        const userExists = await User.findOne({ where: { email } });
         if (userExists) return res.status(400).json({ message: "Este e-mail já está em uso." });
 
         const newUser = await User.create({
             name,
-            email: cleanEmail,
-            password: cleanPassword,
-            cpf: cleanCPF,
+            email,
+            password,
+            cpf,
             phone,
             address,
             role: 'client'
@@ -62,9 +134,9 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * LOGIN DE USUÁRIO
- */
+
+  // LOGIN DE USUÁRIO
+ 
 export const loginUser = async (req: AuthRequest, res: Response) => {
     try {
         const { email, password } = req.body;
@@ -106,12 +178,12 @@ export const loginUser = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * OBTER DADOS DO USUÁRIO LOGADO
- */
+
+ // OBTER DADOS DO USUÁRIO LOGADO
+ 
 export const getMe = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
+        const userId = getAuthorizedUserId(req);
         if (!userId) return res.status(401).json({ message: "Não autorizado." });
 
         const user = await User.findByPk(userId, {
@@ -127,19 +199,18 @@ export const getMe = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * ATUALIZAR PERFIL
- */
+
+ // ATUALIZAR PERFIL
+ 
 export const updateUser = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
+        const userId = getAuthorizedUserId(req);
         if (!userId) return res.status(401).json({ message: "Não autorizado." });
 
         const { name, password, phone, address, cpf } = req.body;
-        const user = await User.findByPk(userId);
+        const user = await findActiveUserById(userId);
 
         if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
-        if (isCancelledEmail(user.email)) return res.status(404).json({ message: "Usuário não encontrado." });
 
         const updateData: UserUpdatePayload = { name, phone, address };
 
@@ -164,12 +235,12 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * CANCELAR CONTA DO USUÁRIO LOGADO
- */
+
+  //CANCELAR CONTA DO USUÁRIO LOGADO
+ 
 export const cancelMyAccount = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.id;
+        const userId = getAuthorizedUserId(req);
         if (!userId) return res.status(401).json({ message: "Não autorizado." });
 
         const user = await User.findByPk(userId);
@@ -188,43 +259,26 @@ export const cancelMyAccount = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * LISTAR CLIENTES (Admin)
- * ALTERAÇÃO: Agora aceita 'limit' via query para permitir exportação total.
- */
+
+ //LISTAR CLIENTES (Admin)
+ 
+ 
 export const listUsersAdmin = async (req: AuthRequest, res: Response) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
         const search = (req.query.search as string) || '';
 
-        // Dinâmico: Se o front enviar limit=9999, usamos. Se não, padrão é 5.
+        
         const queryLimit = parseInt(req.query.limit as string);
         const limit = isNaN(queryLimit) ? 5 : queryLimit;
 
         const offset = (page - 1) * limit;
 
-        // Conta o total absoluto de clientes no banco
+        
         const activeClientWhereClause = getActiveClientWhereClause();
         const totalCountInDB = await User.count({ where: activeClientWhereClause });
 
-        const whereClause: WhereOptions = search
-            ? {
-                role: 'client',
-                email: {
-                    [Op.notLike]: `%${CANCELLED_EMAIL_DOMAIN}`,
-                },
-                [Op.or]: [
-                    where(fn('lower', col('name')), { [Op.like]: `%${search.toLowerCase()}%` }),
-                    where(fn('lower', col('email')), { [Op.like]: `%${search.toLowerCase()}%` }),
-                    where(fn('lower', col('cpf')), { [Op.like]: `%${search.toLowerCase()}%` })
-                ]
-            }
-            : {
-                role: 'client',
-                email: {
-                    [Op.notLike]: `%${CANCELLED_EMAIL_DOMAIN}`,
-                },
-            };
+        const whereClause = buildUserListWhereClause(search);
 
         const { count, rows } = await User.findAndCountAll({
             where: whereClause,
@@ -245,9 +299,9 @@ export const listUsersAdmin = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * ESTATÍSTICAS DO DASHBOARD (Admin)
- */
+
+ //ESTATÍSTICAS DO DASHBOARD (Admin)
+
 export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     try {
         const totalClients = await User.count({
