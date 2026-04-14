@@ -48,7 +48,7 @@ async function removeOrderWithItems(order: Order, transaction: Transaction): Pro
     await order.destroy({ transaction });
 }
 
-// 1. FINALIZAR COMPRA (CHECKOUT) - MANTIDO ORIGINAL
+// 1. FINALIZAR COMPRA (CHECKOUT) 
 export const checkout = async (req: AuthRequest, res: Response) => {
     const t = await sequelize.transaction();
     try {

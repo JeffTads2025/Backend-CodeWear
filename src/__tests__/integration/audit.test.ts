@@ -1,9 +1,7 @@
-import AuditLog from '../models/AuditLogModel';
-import sequelize from '../config/database';
+import AuditLog from '../../models/AuditLogModel';
+import sequelize from '../../config/database';
 
 describe('Testes de Auditoria (Logs)', () => {
-
-  // Limpa logs de auditoria de teste após cada teste
   afterEach(async () => {
     await AuditLog.destroy({
       where: {
@@ -12,11 +10,9 @@ describe('Testes de Auditoria (Logs)', () => {
       }
     });
   });
-
   afterAll(async () => {
     await sequelize.close();
   });
-
   test('Deve ser capaz de registrar uma ação de administrador no log', async () => {
     const logData = {
       adminId: 1,
@@ -24,19 +20,16 @@ describe('Testes de Auditoria (Logs)', () => {
       action: 'DELETE_PRODUCT',
       details: 'O produto Camiseta Unissex ID 10 foi removido do estoque.'
     };
-
     const log = await AuditLog.create(logData);
-
     expect(log.id).toBeDefined();
     expect(log.action).toBe('DELETE_PRODUCT');
     expect(log.adminName).toBe('Admin Jeff');
   });
-
   test('Deve exigir que os campos obrigatórios sejam informados', async () => {
     await expect(
       AuditLog.create({
         adminName: 'Admin'
-      } as { adminId: number; adminName: string; action: string; details: string })
+      } as any)
     ).rejects.toMatchObject({ name: 'SequelizeValidationError' });
   });
 });

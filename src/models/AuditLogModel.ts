@@ -13,8 +13,8 @@ AuditLog.init({
   id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
   adminId: { type: DataTypes.INTEGER, allowNull: false },
   adminName: { type: DataTypes.STRING, allowNull: false },
-  action: { type: DataTypes.STRING, allowNull: false }, // Ex: "ALTEROU PREÇO"
-  details: { type: DataTypes.TEXT, allowNull: true }    // Ex: "De 50.00 para 45.00"
+  action: { type: DataTypes.STRING, allowNull: false }, 
+  details: { type: DataTypes.TEXT, allowNull: true }    
 }, {
   sequelize,
   tableName: 'audit_logs',
